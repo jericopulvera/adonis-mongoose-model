@@ -55,6 +55,11 @@ class MongooseProvider extends ServiceProvider {
     this.app.alias('Adonis/Addons/Mongoose', 'Mongoose')
   }
 
+  _registerFactory () {
+    this.app.bind('Adonis/Src/Factory', () => require('../src/Factory'))
+    this.app.alias('Adonis/Src/Factory', 'Factory')
+  }
+
   _registerModel () {
     this.app.bind('Adonis/Src/MongooseModel', (app) => require('../src/Model/Base'))
     this.app.bind('AdonisMongoose/Src/Token', (app) => require('../src/Model/TokenMongoose'))
@@ -96,6 +101,12 @@ class MongooseProvider extends ServiceProvider {
    * @return {void}
    */
   boot () {
+    /**
+     * Setup ioc resolver for internally accessing fold
+     * methods.
+     */
+    require('../lib/iocResolver').setFold(require('@adonisjs/fold'))
+
     /**
      * Register command with ace.
      */

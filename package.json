@@ -28,13 +28,14 @@
     "coverage": "nyc report --reporter=text-lcov | coveralls"
   },
   "devDependencies": {
+    "@adonisjs/fold": "^4.0.5",
+    "chance": "^1.0.18",
     "coveralls": "^3.0.0",
     "japa": "^1.0.6",
     "japa-cli": "^1.0.1",
     "nyc": "^11.4.1",
     "semver": "^5.5.0",
-    "standard": "^11.0.0",
-    "@adonisjs/fold": "^4.0.5"
+    "standard": "^11.0.0"
   },
   "bugs": {
     "url": "https://github.com/juampi92/adonis-mongoose-model/issues"
