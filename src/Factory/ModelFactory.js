@@ -38,8 +38,7 @@ class ModelFactory {
    * @private
    */
   _newup (attributes) {
-    const modelInstance = new (ioc.use(this.Model))()
-    modelInstance.fill(attributes)
+    const modelInstance = new (ioc.use(this.Model))(attributes)
     return modelInstance
   }
 
@@ -61,7 +60,6 @@ class ModelFactory {
   async _makeOne (index, data) {
     const hash = await this.dataCallback(chancejs, index, data)
     const keys = _.keys(hash)
-
     /**
      * Evaluate all values
      */
@@ -124,8 +122,9 @@ class ModelFactory {
    */
   async create (data = {}, index = 0) {
     const modelInstance = await this.make(data, index)
-    await modelInstance.save()
-    return modelInstance
+    const returnData = await modelInstance.save()
+    console.log(returnData)
+    return returnData
   }
 
   /**
