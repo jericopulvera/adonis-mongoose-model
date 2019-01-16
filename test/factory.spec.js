@@ -5,10 +5,12 @@ const test = require('japa')
 const path = require('path')
 const _ = require('lodash')
 const fs = require('fs')
-const { ioc } = require('@adonisjs/fold')
+const {ioc} = require('@adonisjs/fold')
+
 const Factory = require('../src/Factory')
 const ModelFactory = require('../src/Factory/ModelFactory')
 const ServiceProvider = require('../providers/MongooseProvider')
+
 let Model = null
 
 test.group('Factory', (group) => {
@@ -18,64 +20,72 @@ test.group('Factory', (group) => {
   })
 
   group.before(async () => {
-    const prov = new ServiceProvider(ioc)
-    await prov.register()
-    
+    let Mongoose = use('Mongoose')
     Model = use('MongooseModel')
 
-    ioc.fake('Adonis/Addons/Mongoose', () => require('mongoose'))
-    ioc.fake('Mongoose', () => { 
-      ioc.use('Adonis/Addons/Mongoose') 
-      ioc.alias('Adonis/Addons/Mongoose', 'Mongoose')
+    ioc.singleton('Adonis/Addons/Mongoose', function() {
+      Mongoose.connect(
+        'mongodb://localhost:27017/test',
+        {useNewUrlParser: true}
+      )
+
+      return Mongoose
     })
+    ioc.alias('Adonis/Addons/Mongoose', 'Mongoose')
   })
 
   group.afterEach(async () => {
-    ioc.fake('Mongoose', async () => { 
-      // await ioc.use('Mongoose').dropTable()
-    })
+    try {
+      await ioc.use('Mongoose').connection.deleteModel(/.+/)
+      await ioc.use('Mongoose').connection.dropCollection('users')
+    } catch (err) {
+      return
+    }
   })
 
-  // group.after(async () => {
-  //   await ioc.use('Mongoose').dropTable()
-  // })
+  group.after(async () => {
+    await ioc.use('Mongoose').connection.dropDatabase()
+    await ioc.use('Mongoose').connection.close()
+  })
 
   test('add a new blueprint', (assert) => {
-    const fn = function () {}
+    const fn = function() {}
     Factory.blueprint('App/Models/User', fn)
-    assert.deepEqual(Factory._blueprints, [{ name: 'App/Models/User', callback: fn }])
+    assert.deepEqual(Factory._blueprints, [
+      {name: 'App/Models/User', callback: fn}
+    ])
   })
 
   test('get model factory when accessing the blueprint', (assert) => {
-    const fn = function () {}
+    const fn = function() {}
     Factory.blueprint('App/Models/User', fn)
     assert.instanceOf(Factory.model('App/Models/User'), ModelFactory)
   })
 
   test('return data object from blueprint', async (assert) => {
-    const fn = function () {
+    const fn = function() {
       return {
         name: 'jerico'
       }
     }
     Factory.blueprint('App/Models/User', fn)
     const val = await Factory.model('App/Models/User')._makeOne(1)
-    assert.deepEqual(val, { name: 'jerico' })
+    assert.deepEqual(val, {name: 'jerico'})
   })
 
   test('evaluate functions in data object', async (assert) => {
-    const fn = function () {
+    const fn = function() {
       return {
         name: () => 'jerico'
       }
     }
     Factory.blueprint('App/Models/User', fn)
     const val = await Factory.model('App/Models/User')._makeOne(1)
-    assert.deepEqual(val, { name: 'jerico' })
+    assert.deepEqual(val, {name: 'jerico'})
   })
 
   test('evaluate async functions in data object', async (assert) => {
-    const fn = function () {
+    const fn = function() {
       return {
         name: () => {
           return new Promise((resolve) => {
@@ -86,42 +96,45 @@ test.group('Factory', (group) => {
     }
     Factory.blueprint('App/Models/User', fn)
     const val = await Factory.model('App/Models/User')._makeOne(1)
-    assert.deepEqual(val, { name: 'jerico' })
+    assert.deepEqual(val, {name: 'jerico'})
   })
 
   test('make a single model instance', async (assert) => {
-    class M1 extends Model {
-      static get schema () {
+    Factory.blueprint('App/Models/User', (faker) => {
+      return {
+        name: 'jerico'
+      }
+    })
+
+    class User extends Model {
+      static get schema() {
         return {
           name: {
-            type: String,
-          },
-          email: {
-            type: String,
+            type: String
           }
         }
       }
     }
 
-    Factory.blueprint('App/Models/M1', (faker) => {
-      return {
-        name: 'jerico',
-      }
-    })
-
-    const modelInstance = await M1.buildModel('App/Models/M1')
-    ioc.fake('App/Models/M1', () => {
+    const modelInstance = await User.buildModel('App/Models/User')
+    ioc.fake('App/Models/User', () => {
       return modelInstance
     })
 
-    const user = await Factory.model('App/Models/M1').make()
+    const user = await Factory.model('App/Models/User').make()
     assert.instanceOf(user, modelInstance)
-    assert.deepEqual(_.omit(user.toObject(), '_id'), { name: 'jerico'})
+    assert.deepEqual(_.omit(user.toObject(), '_id'), {name: 'jerico'})
   })
 
   test('make an array of model instances', async (assert) => {
-    class M2 extends Model {
-      static get schema () {
+    Factory.blueprint('App/Models/User', () => {
+      return {
+        username: 'jerico'
+      }
+    })
+
+    class User extends Model {
+      static get schema() {
         return {
           username: {
             type: String
@@ -130,32 +143,26 @@ test.group('Factory', (group) => {
       }
     }
 
-    Factory.blueprint('App/Models/M2', () => {
-      return {
-        username: 'jerico'
-      }
-    })
-
-    const modelInstance = await M2.buildModel('App/Models/M2')
-    ioc.fake('App/Models/M2', () => {
+    const modelInstance = await User.buildModel('App/Models/User')
+    ioc.fake('App/Models/User', () => {
       return modelInstance
     })
 
-    const users = await Factory.model('App/Models/M2').makeMany(2)
+    const users = await Factory.model('App/Models/User').makeMany(2)
     assert.lengthOf(users, 2)
-    assert.deepEqual(_.omit(users[0].toObject(), '_id'), { username: 'jerico' })
-    assert.deepEqual(_.omit(users[1].toObject(), '_id'), { username: 'jerico' })
+    assert.deepEqual(_.omit(users[0].toObject(), '_id'), {username: 'jerico'})
+    assert.deepEqual(_.omit(users[1].toObject(), '_id'), {username: 'jerico'})
   })
 
   test('create model instance', async (assert) => {
-    Factory.blueprint('App/Models/M3', () => {
+    Factory.blueprint('App/Models/User', () => {
       return {
         username: 'jerico'
       }
     })
 
-    class M3 extends Model {
-      static get schema () {
+    class User extends Model {
+      static get schema() {
         return {
           username: {
             type: String
@@ -164,89 +171,96 @@ test.group('Factory', (group) => {
       }
     }
 
-    const modelInstance = await M3.buildModel('App/Models/M3')
-    ioc.fake('App/Models/M3', () => {
+    const modelInstance = await User.buildModel('App/Models/User')
+    ioc.fake('App/Models/User', () => {
       return modelInstance
     })
 
-    const user = await Factory.model('App/Models/M3').create()
-    console.log(user)
-    assert.isTrue(user.$persisted)
+    const user = await Factory.model('App/Models/User').create()
+    assert.instanceOf(user, modelInstance)
   })
 
-  // test('create many model instances', async (assert) => {
-  //   Factory.blueprint('App/Models/User', () => {
-  //     return {
-  //       username: 'jerico'
-  //     }
-  //   })
+  test('create many model instances', async (assert) => {
+    Factory.blueprint('App/Models/User', () => {
+      return {
+        username: 'jerico'
+      }
+    })
 
-  //   class User extends Model {
-  //   }
+    class User extends Model {
+      static get schema() {
+        return {
+          username: {
+            type: String
+          }
+        }
+      }
+    }
 
-  //   ioc.fake('App/Models/User', () => {
-  //     User._bootIfNotBooted()
-  //     return User
-  //   })
+    const modelInstance = await User.buildModel('App/Models/User')
+    ioc.fake('App/Models/User', () => {
+      return modelInstance
+    })
 
-  //   const users = await Factory.model('App/Models/User').createMany(2)
-  //   assert.lengthOf(users, 2)
-  //   assert.isTrue(users[0].$persisted)
-  //   assert.isTrue(users[1].$persisted)
-  // })
+    const users = await Factory.model('App/Models/User').createMany(2)
+    assert.lengthOf(users, 2)
+    users.forEach((user) => {
+      assert.instanceOf(user, modelInstance)
+    })
+  })
 
-  // test('throw exception when factory blueprint doesn\'t have a callback', async (assert) => {
-  //   const fn = () => Factory.blueprint('App/Models/User')
-  //   assert.throw(fn, 'E_INVALID_PARAMETER: Factory.blueprint expects a callback as 2nd parameter')
-  // })
+  test("throw exception when factory blueprint doesn't have a callback", async (assert) => {
+    const fn = () => Factory.blueprint('App/Models/User')
+    assert.throw(
+      fn,
+      'E_INVALID_PARAMETER: Factory.blueprint expects a callback as 2nd parameter'
+    )
+  })
 
-  // test('blueprint should receive faker instance', async (assert) => {
-  //   assert.plan(1)
+  test('blueprint should receive faker instance', async (assert) => {
+    assert.plan(1)
 
-  //   class User extends Model {}
+    class User extends Model {}
 
-  //   ioc.fake('App/Models/User', () => {
-  //     User._bootIfNotBooted()
-  //     return User
-  //   })
+    ioc.fake('App/Models/User', () => {
+      return User
+    })
 
-  //   Factory.blueprint('App/Models/User', (faker) => {
-  //     assert.isFunction(faker.age)
-  //   })
-  //   await Factory.model('App/Models/User').make()
-  // })
+    Factory.blueprint('App/Models/User', (faker) => {
+      assert.isFunction(faker.age)
+    })
+    await Factory.model('App/Models/User').make()
+  })
 
-  // test('blueprint should receive index', async (assert) => {
-  //   const indexes = []
-  //   class User extends Model {}
+  test('blueprint should receive index', async (assert) => {
+    const indexes = []
+    class User extends Model {}
 
-  //   ioc.fake('App/Models/User', () => {
-  //     User._bootIfNotBooted()
-  //     return User
-  //   })
+    ioc.fake('App/Models/User', () => {
+      return User
+    })
 
-  //   Factory.blueprint('App/Models/User', (faker, index) => {
-  //     indexes.push(index)
-  //   })
-  //   await Factory.model('App/Models/User').makeMany(2)
-  //   assert.deepEqual(indexes, [0, 1])
-  // })
+    Factory.blueprint('App/Models/User', (faker, index) => {
+      indexes.push(index)
+    })
+    await Factory.model('App/Models/User').makeMany(2)
+    assert.deepEqual(indexes, [0, 1])
+  })
 
-  // test('blueprint should receive extra data', async (assert) => {
-  //   const stack = []
-  //   class User extends Model {}
+  test('blueprint should receive extra data', async (assert) => {
+    const stack = []
+    class User extends Model {}
 
-  //   ioc.fake('App/Models/User', () => {
-  //     User._bootIfNotBooted()
-  //     return User
-  //   })
+    ioc.fake('App/Models/User', () => {
+      return User
+    })
 
-  //   Factory.blueprint('App/Models/User', (faker, index, data) => {
-  //     stack.push(data)
-  //   })
-  //   await Factory.model('App/Models/User').makeMany(2, { username: 'jerico' })
-  //   assert.deepEqual(stack, [{ username: 'jerico' }, { username: 'jerico' }])
-  // })
+    Factory.blueprint('App/Models/User', (faker, index, data) => {
+      stack.push(data)
+    })
+    await Factory.model('App/Models/User').makeMany(2, {username: 'jerico'})
+    assert.deepEqual(stack, [{username: 'jerico'}, {username: 'jerico'}])
+  })
 
   // test('get data object for table', async (assert) => {
   //   Factory.blueprint('users', () => {
@@ -342,116 +356,162 @@ test.group('Factory', (group) => {
   //   assert.isUndefined(user)
   // })
 
-  // test('reset table via model factory', async (assert) => {
-  //   class User extends Model {}
+  test('reset table via model factory', async (assert) => {
+    Factory.blueprint('App/Models/User', () => {
+      return {
+        username: 'jerico'
+      }
+    })
 
-  //   ioc.fake('App/Models/User', () => {
-  //     User._bootIfNotBooted()
-  //     return User
-  //   })
+    class User extends Model {
+      static get schema() {
+        return {
+          username: {
+            type: String
+          }
+        }
+      }
+    }
 
-  //   Factory.blueprint('App/Models/User', (faker, index, data) => {
-  //     return {}
-  //   })
-  //   await ioc.use('Database').table('users').insert({ username: 'jerico' })
-  //   await Factory.model('App/Models/User').reset()
-  //   const user = await ioc.use('Database').table('users').first()
-  //   assert.isUndefined(user)
-  // })
+    const modelInstance = await User.buildModel('App/Models/User')
+    ioc.fake('App/Models/User', () => {
+      return modelInstance
+    })
 
-  // test('generate username', async (assert) => {
-  //   class User extends Model {}
+    await Factory.model('App/Models/User').create()
+    await Factory.model('App/Models/User').reset()
 
-  //   ioc.fake('App/Models/User', () => {
-  //     User._bootIfNotBooted()
-  //     return User
-  //   })
+    const user = await ioc
+      .use('Mongoose')
+      .connection.collection('users')
+      .findOne()
 
-  //   Factory.blueprint('App/Models/User', (faker, index, data) => {
-  //     return {
-  //       username: faker.username()
-  //     }
-  //   })
+    assert.isNull(user)
+  })
 
-  //   const user = await Factory.model('App/Models/User').make()
-  //   assert.isDefined(user.username)
-  // })
+  test('generate username', async (assert) => {
+    class User extends Model {
+      static get schema() {
+        return {
+          username: {
+            type: String
+          }
+        }
+      }
+    }
 
-  // test('generate password', async (assert) => {
-  //   class User extends Model {}
+    const modelInstance = await User.buildModel('App/Models/User')
+    ioc.fake('App/Models/User', () => {
+      return modelInstance
+    })
 
-  //   ioc.fake('App/Models/User', () => {
-  //     User._bootIfNotBooted()
-  //     return User
-  //   })
+    Factory.blueprint('App/Models/User', (faker, index, data) => {
+      return {
+        username: faker.username()
+      }
+    })
 
-  //   Factory.blueprint('App/Models/User', (faker, index, data) => {
-  //     return {
-  //       password: faker.password()
-  //     }
-  //   })
+    const user = await Factory.model('App/Models/User').make()
+    assert.isDefined(user.username)
+  })
 
-  //   const user = await Factory.model('App/Models/User').make()
-  //   assert.isDefined(user.password)
-  // })
+  test('generate password', async (assert) => {
+    class User extends Model {
+      static get schema() {
+        return {
+          password: {
+            type: String
+          }
+        }
+      }
+    }
 
-  // test('create many pass custom data', async (assert) => {
-  //   Factory.blueprint('App/Models/User', (faker, i, data) => {
-  //     return {
-  //       username: data[i].username
-  //     }
-  //   })
+    const modelInstance = await User.buildModel('App/Models/User')
+    ioc.fake('App/Models/User', () => {
+      return modelInstance
+    })
 
-  //   class User extends Model {
-  //   }
+    Factory.blueprint('App/Models/User', (faker, index, data) => {
+      return {
+        password: faker.password()
+      }
+    })
 
-  //   ioc.fake('App/Models/User', () => {
-  //     User._bootIfNotBooted()
-  //     return User
-  //   })
+    const user = await Factory.model('App/Models/User').make()
+    assert.isDefined(user.password)
+  })
 
-  //   const users = await Factory.model('App/Models/User').createMany(2, [
-  //     {
-  //       username: 'jerico'
-  //     },
-  //     {
-  //       username: 'nikk'
-  //     }
-  //   ])
+  test('create many pass custom data', async (assert) => {
+    Factory.blueprint('App/Models/User', (faker, i, data) => {
+      return {
+        username: data[i].username
+      }
+    })
 
-  //   assert.lengthOf(users, 2)
-  //   assert.equal(users[0].username, 'jerico')
-  //   assert.equal(users[1].username, 'nikk')
-  // })
+    class User extends Model {
+      static get schema() {
+        return {
+          username: {
+            type: String
+          }
+        }
+      }
+    }
 
-  // test('make many pass custom data', async (assert) => {
-  //   Factory.blueprint('App/Models/User', (faker, i, data) => {
-  //     return {
-  //       username: data[i].username
-  //     }
-  //   })
+    const modelInstance = await User.buildModel('App/Models/User')
+    ioc.fake('App/Models/User', () => {
+      return modelInstance
+    })
 
-  //   class User extends Model {
-  //   }
+    const users = await Factory.model('App/Models/User').createMany(2, [
+      {
+        username: 'jerico'
+      },
+      {
+        username: 'nikk'
+      }
+    ])
 
-  //   ioc.fake('App/Models/User', () => {
-  //     User._bootIfNotBooted()
-  //     return User
-  //   })
+    assert.lengthOf(users, 2)
+    assert.equal(users[0].username, 'jerico')
+    assert.equal(users[1].username, 'nikk')
+  })
 
-  //   const users = await Factory.model('App/Models/User').makeMany(2, [
-  //     {
-  //       username: 'joe'
-  //     },
-  //     {
-  //       username: 'john'
-  //     }
-  //   ])
+  test('make many pass custom data', async (assert) => {
+    Factory.blueprint('App/Models/User', (faker, i, data) => {
+      return {
+        username: data[i].username
+      }
+    })
 
-  //   assert.lengthOf(users, 2)
-  //   assert.equal(users[0].username, 'joe')
-  //   assert.equal(users[1].username, 'john')
-  // })
+    class User extends Model {
+      static get schema() {
+        return {
+          username: {
+            type: String
+          }
+        }
+      }
+    }
+
+    const modelInstance = await User.buildModel('App/Models/User')
+    ioc.fake('App/Models/User', () => {
+      return modelInstance
+    })
+
+    const users = await Factory.model('App/Models/User').makeMany(2, [
+      {
+        username: 'joe'
+      },
+      {
+        username: 'john'
+      }
+    ])
+
+    assert.lengthOf(users, 2)
+    assert.equal(users[0].username, 'joe')
+    assert.equal(users[1].username, 'john')
+  })
 
   // test('db factory makeMany pass custom data', async (assert) => {
   //   Factory.blueprint('users', (faker, i, data) => {
@@ -469,7 +529,7 @@ test.group('Factory', (group) => {
   //     }
   //   ])
 
-  //   assert.deepEqual(users, [{ username: 'jerico' }, { username: 'nikk' }])
+  //   assert.deepEqual(users, [{username: 'jerico'}, {username: 'nikk'}])
   // })
 
   // test('db factory createMany pass custom data', async (assert) => {

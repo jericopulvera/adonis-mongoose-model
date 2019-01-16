@@ -2,5 +2,4 @@
 
 const test = require('japa')
 
-test.skip('Mongoose connections', function () {
-})
+test.skip('Mongoose connections', function() {})
