@@ -64,8 +64,8 @@ class MongooseProvider extends ServiceProvider {
   }
 
   _registerFactory() {
-    this.app.bind('Adonis/Src/Factory', () => require('../src/Factory'))
-    this.app.alias('Adonis/Src/Factory', 'Factory')
+    this.app.bind('Adonis/Src/MongooseFactory', () => require('../src/Factory'))
+    this.app.alias('Adonis/Src/MongooseFactory', 'MongooseFactory')
   }
 
   _registerModel() {
