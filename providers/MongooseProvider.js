@@ -103,6 +103,7 @@ class MongooseProvider extends ServiceProvider {
   async register() {
     this._registerSerializer()
     this._registerModel()
+    this.__registerFactory()
     this._registerCommands()
     this._registerMongoose()
   }
