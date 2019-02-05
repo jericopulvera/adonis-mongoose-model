@@ -7,11 +7,11 @@
  *
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
-*/
+ */
 
 const _ = require('lodash')
 const chancejs = require('./chance')
-const { ioc } = require('../../lib/iocResolver')
+const {ioc} = require('../../lib/iocResolver')
 
 /**
  * Model factory to seed database using Lucid
@@ -21,7 +21,7 @@ const { ioc } = require('../../lib/iocResolver')
  * @constructor
  */
 class ModelFactory {
-  constructor (Model, dataCallback) {
+  constructor(Model, dataCallback) {
     this.Model = Model
     this.dataCallback = dataCallback
   }
@@ -37,7 +37,7 @@ class ModelFactory {
    *
    * @private
    */
-  _newup (attributes) {
+  _newup(attributes) {
     const modelInstance = new (ioc.use(this.Model))(attributes)
     return modelInstance
   }
@@ -57,23 +57,29 @@ class ModelFactory {
    *
    * @private
    */
-  async _makeOne (index, data) {
+  async _makeOne(index, data) {
     const hash = await this.dataCallback(chancejs, index, data)
     const keys = _.keys(hash)
     /**
      * Evaluate all values
      */
-    const values = await Promise.all(_.map(_.values(hash), (val) => {
-      return typeof (val) === 'function' ? Promise.resolve(val()) : val
-    }))
+    const values = await Promise.all(
+      _.map(_.values(hash), (val) => {
+        return typeof val === 'function' ? Promise.resolve(val()) : val
+      })
+    )
 
     /**
      * Pair them back in same order
      */
-    return _.transform(keys, (result, key, index) => {
-      result[key] = values[index]
-      return result
-    }, {})
+    return _.transform(
+      keys,
+      (result, key, index) => {
+        result[key] = values[index]
+        return result
+      },
+      {}
+    )
   }
 
   /**
@@ -88,7 +94,7 @@ class ModelFactory {
    *
    * @return {Object}
    */
-  async make (data = {}, index = 0) {
+  async make(data = {}, index = 0) {
     const attributes = await this._makeOne(index, data)
     return this._newup(attributes)
   }
@@ -105,8 +111,10 @@ class ModelFactory {
    *
    * @return {Array}
    */
-  async makeMany (instances, data = {}) {
-    return Promise.all(_.map(_.range(instances), (index) => this.make(data, index)))
+  async makeMany(instances, data = {}) {
+    return Promise.all(
+      _.map(_.range(instances), (index) => this.make(data, index))
+    )
   }
 
   /**
@@ -120,11 +128,10 @@ class ModelFactory {
    *
    * @return {Object}
    */
-  async create (data = {}, index = 0) {
+  async create(data = {}, index = 0) {
     const modelInstance = await this.make(data, index)
-    const returnData = await modelInstance.save()
-    console.log(returnData)
-    return returnData
+    await modelInstance.save()
+    return modelInstance
   }
 
   /**
@@ -139,8 +146,10 @@ class ModelFactory {
    *
    * @return {Array}
    */
-  async createMany (numberOfRows, data = {}) {
-    return Promise.all(_.map(_.range(numberOfRows), (index) => this.create(data, index)))
+  async createMany(numberOfRows, data = {}) {
+    return Promise.all(
+      _.map(_.range(numberOfRows), (index) => this.create(data, index))
+    )
   }
 
   /**
@@ -151,8 +160,8 @@ class ModelFactory {
    *
    * @return {Number}
    */
-  async reset () {
-    return ioc.use(this.Model).truncate()
+  async reset() {
+    return await ioc.use(this.Model).deleteMany({})
   }
 }
 

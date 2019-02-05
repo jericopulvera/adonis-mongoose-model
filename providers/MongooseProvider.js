@@ -7,26 +7,31 @@
  *
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
-*/
+ */
 
-const { ioc, ServiceProvider } = require('@adonisjs/fold')
+const {ioc, ServiceProvider} = require('@adonisjs/fold')
 const Mongoose = require('mongoose')
 
 class MongooseProvider extends ServiceProvider {
   /**
    * Install mongoose serializer
    */
-  _registerSerializer () {
-    ioc.extend('Adonis/Src/Auth',
+  _registerSerializer() {
+    ioc.extend(
+      'Adonis/Src/Auth',
       'mongoose',
       (app) => require('../src/Serializers/MongooseSerializer'),
-      'serializer')
+      'serializer'
+    )
   }
 
-  _registerMongoose () {
-    this.app.singleton('Adonis/Addons/Mongoose', function (app) {
+  _registerMongoose() {
+    this.app.singleton('Adonis/Addons/Mongoose', function(app) {
       const Config = app.use('Adonis/Src/Config')
-      let connectionString = Config.get('database.mongodb.connectionString', null)
+      let connectionString = Config.get(
+        'database.mongodb.connectionString',
+        null
+      )
       const {
         host = 'localhost',
         port = 27017,
@@ -44,7 +49,10 @@ class MongooseProvider extends ServiceProvider {
       }
 
       Mongoose.Promise = global.Promise
-      Mongoose.connect(connectionString, options)
+      Mongoose.connect(
+        connectionString,
+        options
+      )
 
       if (debug) {
         Mongoose.set('debug', true)
@@ -55,14 +63,18 @@ class MongooseProvider extends ServiceProvider {
     this.app.alias('Adonis/Addons/Mongoose', 'Mongoose')
   }
 
-  _registerFactory () {
-    this.app.bind('Adonis/Src/Factory', () => require('../src/Factory'))
-    this.app.alias('Adonis/Src/Factory', 'Factory')
+  _registerFactory() {
+    this.app.bind('Adonis/Src/MongooseFactory', () => require('../src/Factory'))
+    this.app.alias('Adonis/Src/MongooseFactory', 'MongooseFactory')
   }
 
-  _registerModel () {
-    this.app.bind('Adonis/Src/MongooseModel', (app) => require('../src/Model/Base'))
-    this.app.bind('AdonisMongoose/Src/Token', (app) => require('../src/Model/TokenMongoose'))
+  _registerModel() {
+    this.app.bind('Adonis/Src/MongooseModel', (app) =>
+      require('../src/Model/Base')
+    )
+    this.app.bind('AdonisMongoose/Src/Token', (app) =>
+      require('../src/Model/TokenMongoose')
+    )
     this.app.alias('Adonis/Src/MongooseModel', 'MongooseModel')
   }
 
@@ -75,8 +87,10 @@ class MongooseProvider extends ServiceProvider {
    *
    * @private
    */
-  _registerCommands () {
-    this.app.bind('Adonis/Commands/Make:Mongoose', () => require('../commands/MakeModel'))
+  _registerCommands() {
+    this.app.bind('Adonis/Commands/Make:Mongoose', () =>
+      require('../commands/MakeModel')
+    )
   }
 
   /**
@@ -86,9 +100,10 @@ class MongooseProvider extends ServiceProvider {
    *
    * @return {void}
    */
-  async register () {
+  async register() {
     this._registerSerializer()
     this._registerModel()
+    this._registerFactory()
     this._registerCommands()
     this._registerMongoose()
   }
@@ -100,7 +115,7 @@ class MongooseProvider extends ServiceProvider {
    *
    * @return {void}
    */
-  boot () {
+  boot() {
     /**
      * Setup ioc resolver for internally accessing fold
      * methods.
